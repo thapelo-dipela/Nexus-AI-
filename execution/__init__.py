@@ -1,6 +1,7 @@
 """
 NEXUS Position Sizing — volatility-scaled sizing based on risk and confidence.
 """
+import math
 import config
 
 
@@ -20,6 +21,14 @@ def compute_position_size(
     Returns:
         Position size in USD, clamped to [MIN, MAX]
     """
+    if not all(math.isfinite(value) for value in (portfolio_value, atr_pct, confidence)):
+        return 0.0
+    if portfolio_value <= 0 or atr_pct < 0 or not 0 < confidence <= 1:
+        return 0.0
+    cap = min(config.MAX_TRADE_SIZE_USD, portfolio_value * config.MAX_POSITION_PCT / 100)
+    if cap < config.MIN_TRADE_SIZE_USD:
+        return 0.0
+
     # Base risk: 1% of portfolio
     base_risk = portfolio_value * config.RISK_PCT_PER_TRADE
 
@@ -32,4 +41,4 @@ def compute_position_size(
     sized = base_risk * confidence * vol_scalar
 
     # Clamp to config limits
-    return max(config.MIN_TRADE_SIZE_USD, min(config.MAX_TRADE_SIZE_USD, sized))
+    return min(cap, max(config.MIN_TRADE_SIZE_USD, sized))

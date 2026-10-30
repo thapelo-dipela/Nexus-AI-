@@ -229,7 +229,7 @@ def trade_cycle(
                 agent_votes={v.agent_id: v.direction.value for v in current_votes},
             )
             if signed_outcome:
-                reputation_client.push_outcome(signed_outcome, dry_run=False)
+                reputation_client.push_outcome(signed_outcome, dry_run=dry_run)
         if positions_to_close:
             return True
 
@@ -285,6 +285,9 @@ def trade_cycle(
         atr_pct,
         consensus_confidence,
     )
+    if position_size_usd <= 0:
+        logger.warning("Trade skipped: no valid position size within portfolio limits")
+        return True
 
     # ============ STEP 6: Load equity curve for Sharpe calculation ============
     equity_curve = []
@@ -357,7 +360,7 @@ def trade_cycle(
             agent_votes={v.agent_id: v.direction.value for v in votes},
         )
         if signed_outcome:
-            reputation_client.push_outcome(signed_outcome, dry_run=False)
+            reputation_client.push_outcome(signed_outcome, dry_run=dry_run)
     else:
         logger.info(f"[dim]DRY-RUN: Would execute {consensus_direction.value} {volume} {config.PAIR}[/dim]")
         position_manager.open_position(

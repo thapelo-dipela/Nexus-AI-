@@ -29,6 +29,8 @@ class KrakenClient:
         Returns:
             Response dict from Kraken CLI
         """
+        if self.dry_run:
+            return {"dry_run": True, "side": "buy", "volume": volume, "pair": self.pair}
         try:
             cmd = [
                 self.cli_path,
@@ -70,6 +72,8 @@ class KrakenClient:
         Returns:
             Response dict from Kraken CLI
         """
+        if self.dry_run:
+            return {"dry_run": True, "side": "sell", "volume": volume, "pair": self.pair}
         try:
             cmd = [
                 self.cli_path,
