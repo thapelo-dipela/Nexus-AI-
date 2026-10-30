@@ -8,13 +8,14 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from flask import Flask, jsonify, render_template, send_file
-from flask_cors import CORS
 import logging
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from data.prism import PRISMClient
+import config
+from data.prism import PrismClient
+from execution.kraken import KrakenClient
 from agents.sentiment import fetch_composite_sentiment
 
 # Configure logging
@@ -23,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask
 app = Flask(__name__)
-CORS(app)
+
 
 # Initialize PRISM client
 try:
-    prism_client = PRISMClient()
+    prism_client = PrismClient(config.PRISM_API_KEY, KrakenClient(dry_run=True))
     logger.info("✅ PRISM client initialized")
 except Exception as e:
     logger.error(f"❌ Failed to initialize PRISM client: {e}")
@@ -37,41 +38,50 @@ except Exception as e:
 # Data Loading Functions
 # ============================================================================
 
-def load_agent_weights():
-    """Load agent weights from nexus_weights.json"""
+def load_records(filename):
+    """Read state relative to the project, returning empty only when absent."""
+    path = Path(__file__).resolve().parent / filename
     try:
-        with open('nexus_weights.json', 'r') as f:
-            return json.load(f)
+        with path.open(encoding='utf-8') as handle:
+            records = json.load(handle)
+        if not isinstance(records, list):
+            raise ValueError(f"Expected a list in {filename}")
+        return records
     except FileNotFoundError:
-        logger.warning("nexus_weights.json not found, returning empty")
         return []
+
+
+def load_agent_weights():
+    return load_records(config.WEIGHTS_FILE)
+
 
 def load_positions():
-    """Load current positions from nexus_positions.json"""
-    try:
-        with open('nexus_positions.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
+    return [p for p in load_records(config.POSITIONS_FILE) if p.get('status') == 'open']
+
 
 def load_equity_curve():
-    """Load equity curve from nexus_equity_curve.json"""
-    try:
-        with open('nexus_equity_curve.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        # Generate mock equity curve
-        equity_data = []
-        base_equity = 10000
-        for i in range(30):
-            date = (datetime.now() - timedelta(days=30-i)).strftime('%Y-%m-%d')
-            daily_pnl = (i % 3 - 1) * 50 + 75  # Varied returns
-            equity_data.append({
-                'date': date,
-                'equity': base_equity + (i * 50),
-                'drawdown': max(0, (10000 - (base_equity + i * 50)) / 10000 * 100)
-            })
-        return equity_data
+    return load_records(config.EQUITY_CURVE_FILE)
+
+
+def portfolio_performance():
+    """Count each closed position once, rather than summing agent attribution."""
+    closed = [p for p in load_records(config.POSITIONS_FILE) if p.get('status') == 'closed']
+    wins = sum(p.get('pnl_usd', 0) > 0 for p in closed)
+    losses = sum(p.get('pnl_usd', 0) < 0 for p in closed)
+    pnl = sum(p.get('pnl_usd', 0) for p in closed)
+    peak = 0
+    drawdown = 0
+    for point in load_equity_curve():
+        equity = point['equity']
+        peak = max(peak, equity)
+        if peak > 0:
+            drawdown = max(drawdown, (peak - equity) / peak * 100)
+    return {
+        'total_trades': len(closed), 'wins': wins, 'losses': losses,
+        'win_rate': wins / len(closed) * 100 if closed else 0,
+        'total_pnl': pnl, 'avg_pnl': pnl / len(closed) if closed else 0,
+        'max_drawdown': drawdown, 'open_positions': len(load_positions()),
+    }
 
 # ============================================================================
 # API Endpoints
@@ -80,7 +90,7 @@ def load_equity_curve():
 @app.route('/')
 def dashboard():
     """Serve the dashboard HTML"""
-    return send_file('dashboard.html')
+    return send_file(Path(__file__).resolve().parent / 'dashboard.html')
 
 @app.route('/api/market', methods=['GET'])
 def get_market_data():
@@ -89,6 +99,8 @@ def get_market_data():
         if prism_client:
             # Get price from PRISM
             price_data = prism_client.get_price('BTC')
+            if not price_data or price_data.get('price', 0) <= 0:
+                return jsonify({'success': False, 'error': 'Market data unavailable'}), 503
             
             # Get signals
             signals_1h = prism_client.get_signals('BTC', '1h')
@@ -99,12 +111,12 @@ def get_market_data():
             
             return jsonify({
                 'success': True,
-                'price': price_data.get('current_price', 0),
-                'change_24h': price_data.get('change_24h_pct', 0),
-                'volume_24h': price_data.get('volume_24h', 0),
+                'price': price_data['price'],
+                'change_24h': None,  # PRISM price adapter does not supply this metric
+                'volume_24h': None,
                 'signal_1h': signals_1h.direction if signals_1h else 'neutral',
                 'signal_4h': signals_4h.direction if signals_4h else 'neutral',
-                'risk_score': risk.risk_score if risk else 0,
+                'risk_score': risk.risk_score if risk else None,
                 'timestamp': datetime.now().isoformat()
             })
         else:
@@ -186,7 +198,7 @@ def get_positions():
             'success': True,
             'positions': positions,
             'count': len(positions),
-            'total_exposure': sum(p.get('size_usd', 0) for p in positions),
+            'total_exposure': sum(p.get('entry_price', 0) * p.get('volume', 0) for p in positions),
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
@@ -225,17 +237,7 @@ def get_risk():
                     'timestamp': datetime.now().isoformat()
                 })
         
-        # Fallback to mock data
-        return jsonify({
-            'success': True,
-            'risk_score': 42.5,
-            'atr_pct': 1.2,
-            'volatility_30d': 22.5,
-            'max_drawdown_30d': 8.3,
-            'sharpe_ratio': 1.45,
-            'sortino_ratio': 2.1,
-            'timestamp': datetime.now().isoformat()
-        })
+        return jsonify({'success': False, 'error': 'Risk data unavailable'}), 503
     except Exception as e:
         logger.error(f"Error fetching risk data: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -244,43 +246,8 @@ def get_risk():
 def get_performance():
     """Get comprehensive performance metrics"""
     try:
-        agents = load_agent_weights()
-        positions = load_positions()
-        equity_data = load_equity_curve()
-        
-        # Calculate performance metrics
-        total_trades = sum(a.get('trades_closed', 0) for a in agents)
-        total_wins = sum(a.get('wins', 0) for a in agents)
-        total_pnl = sum(a.get('pnl_total', 0) for a in agents)
-        
-        # Calculate Sharpe and Max Drawdown from equity curve
-        if equity_data:
-            equity_values = [e['equity'] for e in equity_data]
-            max_equity = max(equity_values)
-            min_equity = min(equity_values)
-            max_dd = (max_equity - min_equity) / max_equity * 100 if max_equity > 0 else 0
-            returns = [(equity_values[i] - equity_values[i-1]) / equity_values[i-1] * 100 
-                      for i in range(1, len(equity_values))]
-            avg_return = sum(returns) / len(returns) if returns else 0
-        else:
-            max_dd = 0
-            avg_return = 0
-        
-        return jsonify({
-            'success': True,
-            'performance': {
-                'total_trades': total_trades,
-                'wins': total_wins,
-                'losses': total_trades - total_wins if total_trades > 0 else 0,
-                'win_rate': (total_wins / total_trades * 100) if total_trades > 0 else 0,
-                'total_pnl': total_pnl,
-                'avg_pnl': (total_pnl / total_trades) if total_trades > 0 else 0,
-                'max_drawdown': max_dd,
-                'avg_daily_return': avg_return,
-                'open_positions': len(positions),
-            },
-            'timestamp': datetime.now().isoformat()
-        })
+        return jsonify({'success': True, 'performance': portfolio_performance(),
+                        'timestamp': datetime.now().isoformat()})
     except Exception as e:
         logger.error(f"Error fetching performance data: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -291,7 +258,7 @@ def health():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'prism_connected': prism_client is not None,
+        'prism_configured': bool(config.PRISM_API_KEY),
     })
 
 # ============================================================================
@@ -323,4 +290,4 @@ if __name__ == '__main__':
     logger.info("   - GET  /api/performance → Overall performance")
     logger.info("   - GET  /api/health      → Health check")
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=False)

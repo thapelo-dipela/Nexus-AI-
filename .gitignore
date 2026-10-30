@@ -1,0 +1,28 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Python and editor artifacts
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# JavaScript builds
+node_modules/
+dist/
+artifacts/
+cache/
+coverage/
+# Local trading state
+/nexus_*.json
+/hold_log.json
+/sandbox_*.json
+*.log

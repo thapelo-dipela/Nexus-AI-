@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NEXUS Trading AI - Performance Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -467,7 +466,7 @@
         <div class="status">
             <div class="status-indicator"></div>
             <div>
-                <div class="status-text">Status: <strong id="status-text">Connected</strong></div>
+                <div class="status-text">Market data: <strong id="status-text">Loading</strong></div>
                 <div class="status-text" id="status-time">--:--:-- UTC</div>
             </div>
         </div>
@@ -507,7 +506,7 @@
 
         <!-- Price Chart -->
         <div class="panel price-chart">
-            <div class="panel-title">BTC/USD Price Action - 1H</div>
+            <div class="panel-title">BTC/USD Observed Price Samples</div>
             <div class="chart-container">
                 <canvas id="priceChart"></canvas>
             </div>
@@ -532,7 +531,7 @@
                 </div>
                 <div class="metric-box">
                     <div class="metric-value" id="avg-return">0%</div>
-                    <div class="metric-label">Avg Return</div>
+                    <div class="metric-label">Avg PnL / Trade</div>
                 </div>
             </div>
             <div class="controls">
@@ -633,7 +632,7 @@
         // Configuration
         const CONFIG = {
             UPDATE_INTERVAL: 15000, // 15 seconds
-            API_BASE: 'http://localhost:5000',
+            API_BASE: '',
         };
 
         // State
@@ -657,136 +656,82 @@
 
         // Update all data
         async function updateAllData() {
+            if (state.updating) return;
+            state.updating = true;
             try {
                 await Promise.all([
                     fetchMarketData(),
                     fetchAgentData(),
-                    fetchPriceData(),
+                    fetchRiskData(),
+                    fetchPerformanceData(),
                     fetchEquityData(),
                     fetchSentimentData(),
                 ]);
+                fetchPriceData();
                 updateUI();
                 updateCharts();
             } catch (error) {
                 console.error('Error updating data:', error);
+            } finally {
+                state.updating = false;
             }
         }
 
-        // Fetch market data
+        async function getJSON(endpoint) {
+            const response = await fetch(`${CONFIG.API_BASE}/api/${endpoint}`, {signal: AbortSignal.timeout(45000)});
+            if (!response.ok) throw new Error(`${endpoint}: ${response.status}`);
+            const data = await response.json();
+            if (!data.success) throw new Error(data.error || 'Data unavailable');
+            return data;
+        }
         async function fetchMarketData() {
             try {
-                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_vol=true&include_market_cap=true&include_last_updated_at=true');
-                const data = await response.json();
-                state.marketData = {
-                    price: data.bitcoin.usd,
-                    volume24h: data.bitcoin.usd_24h_vol,
-                    change24h: data.bitcoin.usd_24h_change || 0,
-                };
-            } catch (error) {
-                console.error('Error fetching market data:', error);
-            }
+                const data = await getJSON('market');
+                state.marketData = {price: data.price, volume24h: data.volume_24h, change24h: data.change_24h};
+            } catch { state.marketData = {}; }
         }
-
-        // Fetch agent data from local weights file
         async function fetchAgentData() {
-            try {
-                const response = await fetch('nexus_weights.json');
-                state.agents = await response.json();
-            } catch (error) {
-                console.error('Error fetching agent data:', error);
-                // Use mock data if file not found
-                state.agents = [
-                    { agent_id: 'momentum', weight: 1.05, trades_closed: 12, wins: 7, losses: 5, pnl_total: 125.50 },
-                    { agent_id: 'sentiment', weight: 0.95, trades_closed: 10, wins: 4, losses: 6, pnl_total: -45.20 },
-                    { agent_id: 'risk_guardian', weight: 1.02, trades_closed: 15, wins: 8, losses: 7, pnl_total: 85.30 },
-                    { agent_id: 'mean_reversion', weight: 0.98, trades_closed: 8, wins: 5, losses: 3, pnl_total: 62.10 },
-                ];
-            }
+            try { state.agents = (await getJSON('agents')).agents; }
+            catch { state.agents = []; }
         }
-
-        // Fetch price data (simulated with mock data)
-        async function fetchPriceData() {
-            // Generate realistic price data
-            const now = Date.now();
-            state.priceData = [];
-            let price = state.marketData.price || 45000;
-            
-            for (let i = 24; i >= 0; i--) {
-                const timestamp = new Date(now - i * 3600000);
-                const volatility = (Math.random() - 0.5) * 200;
-                price += volatility;
-                state.priceData.push({
-                    time: timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-                    price: Math.round(price * 100) / 100,
-                });
-            }
+        function fetchPriceData() {
+            if (!Number.isFinite(state.marketData.price)) return;
+            state.priceData.push({time: new Date().toLocaleTimeString(), price: state.marketData.price});
+            state.priceData = state.priceData.slice(-240);
         }
-
-        // Fetch equity data
         async function fetchEquityData() {
             try {
-                const response = await fetch('nexus_equity_curve.json');
-                state.equityData = await response.json();
-            } catch (error) {
-                console.error('Error fetching equity data:', error);
-                // Generate mock equity curve
-                state.equityData = [];
-                let equity = 10000;
-                const now = Date.now();
-                
-                for (let i = 0; i < 30; i++) {
-                    const timestamp = new Date(now - (30 - i) * 86400000).toLocaleDateString();
-                    const dailyReturn = (Math.random() - 0.48) * 500;
-                    equity += dailyReturn;
-                    state.equityData.push({
-                        date: timestamp,
-                        equity: Math.round(equity * 100) / 100,
-                        drawdown: Math.max(0, (10000 - equity) / 10000 * 100),
-                    });
-                }
-            }
+                let peak = 0;
+                state.equityData = (await getJSON('equity')).data.map(point => {
+                    peak = Math.max(peak, point.equity);
+                    return {...point, date: point.date || new Date(point.timestamp * 1000).toLocaleString(),
+                        drawdown: peak > 0 ? (peak - point.equity) / peak * 100 : 0};
+                });
+            } catch { state.equityData = []; }
         }
-
-        // Fetch sentiment data
         async function fetchSentimentData() {
-            try {
-                const fngResponse = await fetch('https://api.alternative.me/fng/?limit=1');
-                const fngData = await fngResponse.json();
-                const fngValue = parseInt(fngData.data[0].value);
-                
-                state.sentimentData = {
-                    fng: fngValue,
-                    trending: Math.random() * 100,
-                    community: Math.random() * 100,
-                    momentum: Math.random() * 100,
-                };
-            } catch (error) {
-                console.error('Error fetching sentiment data:', error);
-                state.sentimentData = {
-                    fng: Math.random() * 100,
-                    trending: Math.random() * 100,
-                    community: Math.random() * 100,
-                    momentum: Math.random() * 100,
-                };
-            }
+            try { state.sentimentData = {fng: (await getJSON('sentiment')).fear_greed}; }
+            catch { state.sentimentData = {}; }
+        }
+        async function fetchRiskData() {
+            try { state.riskData = await getJSON('risk'); }
+            catch { state.riskData = {}; }
+        }
+        async function fetchPerformanceData() {
+            try { state.performance = (await getJSON('performance')).performance; }
+            catch { state.performance = {}; }
+        }
+        function formatValue(value, suffix = '', prefix = '') {
+            return Number.isFinite(value) ? `${prefix}${value.toFixed(2)}${suffix}` : 'Unavailable';
         }
 
         // Update UI
         function updateUI() {
-            // Market Overview
-            const btcPrice = state.marketData.price || 45000;
-            const btcChange = state.marketData.change24h || 0;
-            const volume = state.marketData.volume24h || 0;
-
-            document.getElementById('btc-price').textContent = `$${btcPrice.toFixed(2)}`;
-            document.getElementById('btc-change').textContent = `${btcChange > 0 ? '+' : ''}${btcChange.toFixed(2)}%`;
-            document.getElementById('btc-change').className = `stat-change ${btcChange > 0 ? 'bullish' : 'bearish'}`;
-            document.getElementById('volume-24h').textContent = `$${(volume / 1e9).toFixed(2)}B`;
-
-            // Market Regime
-            const regimes = ['Trending', 'Ranging', 'Volatile'];
-            const regime = regimes[Math.floor(Math.random() * regimes.length)];
-            document.getElementById('market-regime').textContent = regime;
+            document.getElementById('status-text').textContent = Number.isFinite(state.marketData.price) ? 'Available' : 'Unavailable';
+            document.getElementById('btc-price').textContent = formatValue(state.marketData.price, '', '$');
+            document.getElementById('btc-change').textContent = formatValue(state.marketData.change24h, '%');
+            document.getElementById('volume-24h').textContent = formatValue(state.marketData.volume24h, '', '$');
+            document.getElementById('market-regime').textContent = 'Unavailable';
 
             // Agent Performance
             const agentContainer = document.getElementById('agent-container');
@@ -805,7 +750,7 @@
                 const card = document.createElement('div');
                 card.className = 'agent-card';
                 card.innerHTML = `
-                    <div class="agent-name">${agent.agent_id.toUpperCase()}</div>
+                    <div class="agent-name">${String(agent.agent_id).toUpperCase().replace(/[&<>"']/g, "")}</div>
                     <div class="agent-stats">
                         <div class="agent-stat-item">
                             <span class="agent-stat-label">Weight:</span>
@@ -831,32 +776,20 @@
                 agentContainer.appendChild(card);
             });
 
-            // Update metrics
-            const winRate = totalTrades > 0 ? ((totalWins / totalTrades) * 100).toFixed(1) : '0';
-            document.getElementById('total-trades').textContent = totalTrades;
-            document.getElementById('win-rate').textContent = `${winRate}%`;
-            document.getElementById('total-pnl').textContent = `$${totalPnL.toFixed(2)}`;
-            document.getElementById('avg-return').textContent = totalTrades > 0 ? `${(totalPnL / totalTrades).toFixed(2)}%` : '0%';
-
-            // Risk Metrics
-            const riskScore = Math.floor(Math.random() * 100);
-            const riskClass = riskScore < 50 ? 'safe' : riskScore < 75 ? 'warning' : 'danger';
-            document.getElementById('risk-score').textContent = riskScore;
-            document.getElementById('risk-score').className = `risk-value ${riskClass}`;
-            document.getElementById('max-drawdown').textContent = `${(Math.random() * 15).toFixed(2)}%`;
-            document.getElementById('sharpe-ratio').textContent = (Math.random() * 2 + 0.5).toFixed(2);
-            document.getElementById('volatility').textContent = `${(Math.random() * 20 + 10).toFixed(2)}%`;
-
-            // Sentiment Data
-            if (state.sentimentData) {
-                document.getElementById('fng-value').textContent = `${Math.round(state.sentimentData.fng)}`;
-                document.getElementById('fng-gauge').style.width = `${state.sentimentData.fng}%`;
-                document.getElementById('trending').textContent = `${Math.round(state.sentimentData.trending)}`;
-                document.getElementById('trending-gauge').style.width = `${state.sentimentData.trending}%`;
-                document.getElementById('community').textContent = `${Math.round(state.sentimentData.community)}`;
-                document.getElementById('community-gauge').style.width = `${state.sentimentData.community}%`;
-                document.getElementById('momentum').textContent = `${Math.round(state.sentimentData.momentum)}`;
-                document.getElementById('momentum-gauge').style.width = `${state.sentimentData.momentum}%`;
+            const performance = state.performance || {};
+            document.getElementById('total-trades').textContent = performance.total_trades ?? 'Unavailable';
+            document.getElementById('win-rate').textContent = formatValue(performance.win_rate, '%');
+            document.getElementById('total-pnl').textContent = formatValue(performance.total_pnl, '', '$');
+            document.getElementById('avg-return').textContent = formatValue(performance.avg_pnl, '', '$');
+            const risk = state.riskData || {};
+            document.getElementById('risk-score').textContent = formatValue(risk.risk_score);
+            document.getElementById('max-drawdown').textContent = formatValue(performance.max_drawdown, '%');
+            document.getElementById('sharpe-ratio').textContent = formatValue(risk.sharpe_ratio);
+            document.getElementById('volatility').textContent = formatValue(risk.volatility_30d, '%');
+            for (const [id, key] of [['fng', 'fng'], ['trending', 'trending'], ['community', 'community'], ['momentum', 'momentum']]) {
+                const value = (state.sentimentData || {})[key];
+                document.getElementById(id === 'fng' ? 'fng-value' : id).textContent = formatValue(value);
+                document.getElementById(`${id}-gauge`).style.width = `${Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0}%`;
             }
         }
 

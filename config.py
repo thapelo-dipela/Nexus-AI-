@@ -2,6 +2,10 @@
 NEXUS Configuration — all env vars, defaults, and constants.
 """
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 # PRISM Configuration
 PRISM_API_KEY = os.getenv("PRISM_API_KEY", "")
@@ -25,7 +29,7 @@ PAIR = os.getenv("NEXUS_PAIR", "XXBTZUSD")
 # Kraken API (read-only for lablab.ai competition leaderboard)
 KRAKEN_API_KEY = os.getenv("KRAKEN_API_KEY", "")
 KRAKEN_API_SECRET = os.getenv("KRAKEN_API_SECRET", "")
-KRAKEN_SUBMISSION_ENABLED = os.getenv("KRAKEN_SUBMISSION_ENABLED", "true").lower() == "true"
+KRAKEN_SUBMISSION_ENABLED = os.getenv("KRAKEN_SUBMISSION_ENABLED", "false").lower() == "true"
 
 # Loop Configuration
 LOOP_INTERVAL_SECONDS = int(os.getenv("NEXUS_LOOP_INTERVAL", "300"))
