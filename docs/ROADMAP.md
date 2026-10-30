@@ -7,7 +7,8 @@
 - [x] Enforce the guardian's explicit risk veto in consensus.
 - [x] Disable unfinished Python live execution.
 - [x] Add contributor instructions and repeatable local checks.
-- [ ] Choose a root license and verify bundled-code provenance and notices.
+- [x] Apply Apache-2.0 to original NEXUS material with owner attribution.
+- [ ] Verify bundled-code provenance and complete third-party notices.
 - [ ] Restore hosted CI availability and verify a clean install on supported platforms.
 - [ ] Triage dependency audit results by reachable code and supported runtime; review upgrades individually.
 

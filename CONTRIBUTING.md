@@ -30,3 +30,12 @@ The independent MCP server has its own build and test commands in its README.
 Do not include private data in issues or pull requests. See SECURITY.md for reporting.
 Describe bugs with versions, reproduction steps, expected/actual behavior, and redacted logs.
 Be respectful, discuss the code, and keep feedback specific and constructive.
+
+## Contribution licensing
+
+Original NEXUS code is licensed under Apache-2.0. Unless explicitly stated otherwise,
+contributions intentionally submitted for inclusion in that code are provided under
+Apache-2.0, consistent with section 5 of LICENSE. You retain your copyright.
+Submit only work you have the right to contribute, and identify imported code and
+its applicable notices. Changes to the separately bundled MIT-declared components
+must preserve their existing licensing. See docs/LICENSING.md and THIRD_PARTY_NOTICES.md.

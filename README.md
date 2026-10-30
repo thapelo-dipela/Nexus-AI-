@@ -73,5 +73,14 @@ The independent TypeScript projects retain their own dependencies and lockfiles.
 ## Development
 
 See [contribution instructions](CONTRIBUTING.md), the [roadmap](docs/ROADMAP.md), and
-[security guidance](SECURITY.md). Root license selection and bundled-code attribution
-remain outstanding; see [licensing status](docs/LICENSING.md).
+[security guidance](SECURITY.md).
+
+## License
+
+Original NEXUS code and documentation are licensed under [Apache 2.0](LICENSE).
+Copyright 2026 Thapelo Dipela. See [NOTICE](NOTICE).
+
+The bundled PRISM MCP server and trading-agent template retain their existing MIT
+declarations; they are not relicensed by the root license. See the
+[license scope](docs/LICENSING.md) and [third-party inventory](THIRD_PARTY_NOTICES.md)
+for remaining attribution verification before redistributing those components.

@@ -1,7 +1,8 @@
 # Project status
 
 **Stage: experimental development preview.** The project is intended to become a
-reusable foundation, but production trading and unrestricted reuse are not yet established.
+reusable foundation. Original NEXUS material is Apache-2.0 licensed; production trading
+and bundled-component attribution still require work.
 
 | Component | Current status |
 | --- | --- |
@@ -11,7 +12,7 @@ reusable foundation, but production trading and unrestricted reuse are not yet e
 | Dashboard | Local API reporting; depends on available records and external data |
 | Contract template | Separate project; configuration tests and type-check available |
 | PRISM MCP server | Separate project with its own SDK dependency and tests |
-| Licensing | Root license selection and third-party provenance review outstanding |
+| Licensing | Original NEXUS: Apache-2.0; bundled MIT declarations preserved; provenance review outstanding |
 
 Passing unit tests does not establish profitability, exchange compatibility, or
 contract correctness. See KNOWN_LIMITATIONS.md and ROADMAP.md for release gates.
