@@ -24,3 +24,12 @@ coverage.json
 .specstory/
 checkpoints.jsonl
 src/typechain/
+
+# Private deployment and identity state
+.env.*
+!.env.example
+deployed.json
+agent-id.json
+*.keystore
+*.p12
+*.pfx
