@@ -6,8 +6,9 @@
  */
 
 import { ethers } from "hardhat";
+import { requiredAddress } from "./private-config";
 
-const VAULT_ADDRESS = "0x0E7CD8ef9743FEcf94f9103033a044caBD45fC90";
+const VAULT_ADDRESS = requiredAddress("HACKATHON_VAULT_ADDRESS");
 const NEW_ALLOCATION = ethers.parseEther("0.001"); // 0.001 ETH per team (down from 0.05)
 const TOP_UP_AMOUNT  = ethers.parseEther("0.04");  // deposit 0.04 ETH — covers 40 teams at 0.001 each
 
