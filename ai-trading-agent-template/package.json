@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "Reusable AI trading agent template with on-chain identity (ERC-8004), Kraken execution, and EIP-712 verified explainability",
   "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:config": "mocha -r ts-node/register test/private-config.test.ts",
     "compile": "npx hardhat compile",
     "deploy": "npx hardhat run scripts/deploy.ts --network sepolia",
     "register": "npx ts-node scripts/register-agent.ts",
