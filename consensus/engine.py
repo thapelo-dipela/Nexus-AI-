@@ -52,11 +52,13 @@ class AgentRecord:
 class ConsensusEngine:
     """Reputation-weighted consensus with PnL-proportional learning."""
 
-    def __init__(self):
+    def __init__(self, persist: bool = True):
+        self.persist = persist
         self.records: Dict[str, AgentRecord] = {}
         self.hold_log: List[Dict] = []
         self.hold_log_timestamps: Dict[int, Dict] = {}  # For counterfactual tracking
-        self.load_weights()
+        if self.persist:
+            self.load_weights()
 
     def load_weights(self):
         """Load agent weights from nexus_weights.json."""
@@ -81,6 +83,8 @@ class ConsensusEngine:
 
     def save_weights(self):
         """Persist agent weights to nexus_weights.json."""
+        if not self.persist:
+            return
         try:
             data = [rec.to_dict() for rec in self.records.values()]
             with open(config.WEIGHTS_FILE, "w") as f:
@@ -117,6 +121,12 @@ class ConsensusEngine:
             logger.warning("[yellow]All agents retired; cannot vote[/yellow]")
             from agents.base import VoteDirection
             return VoteDirection.HOLD, 0.0, votes
+
+        # Risk controls cannot be outvoted by directional agents.
+        if any(v.agent_id == "risk_guardian" and v.component_scores.get("veto_triggered")
+               for v in votes):
+            from agents.base import VoteDirection
+            return VoteDirection.HOLD, 1.0, active_votes
 
         # Compute weighted scores
         buy_score = 0.0

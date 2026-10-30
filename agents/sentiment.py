@@ -133,7 +133,9 @@ class SentimentAgent(BaseAgent):
         fng_score = self._fear_greed_score(market_data.fear_greed_index)
 
         # Multi-source composite sentiment (10% weight) — replaces CryptoPanic news NLP
-        composite_sentiment = fetch_composite_sentiment()
+        composite_sentiment = market_data.news_sentiment
+        if composite_sentiment is None:
+            composite_sentiment = fetch_composite_sentiment()
 
         # Composite score with weights
         composite = (prism_signal_score * 0.40) + (price_change_score * 0.20) + (fng_score * 0.30) + (composite_sentiment * 0.10)

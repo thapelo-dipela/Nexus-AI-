@@ -1,0 +1,10 @@
+NEXUS
+Copyright 2026 Thapelo Dipela
+
+Original NEXUS code and documentation are licensed under the Apache License,
+Version 2.0. See LICENSE for the full terms and docs/LICENSING.md for scope.
+
+The separately bundled PRISM-MCP-Server and ai-trading-agent-template components
+retain their existing license declarations and notices. They are not relicensed
+by the root Apache license. Dependencies retain their respective licenses.
+See THIRD_PARTY_NOTICES.md for the component inventory and verification status.

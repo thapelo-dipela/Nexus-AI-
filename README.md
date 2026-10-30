@@ -2,7 +2,7 @@
 
 NEXUS is an experimental BTC trading system with agent voting, reputation weights, PRISM market data, Kraken integration, and optional on-chain reputation tooling.
 
-**Start in dry-run mode. Live execution and accounting have unresolved correctness issues described in [known limitations](docs/KNOWN_LIMITATIONS.md).**
+**Development preview: Python live execution is disabled.** Start with the offline demo below. See [project status](docs/PROJECT_STATUS.md), [known limitations](docs/KNOWN_LIMITATIONS.md), and [licensing status](docs/LICENSING.md) before building a downstream product.
 
 ## Setup
 
@@ -24,6 +24,19 @@ python main.py --dry-run
 ```
 
 Dry-run suppresses order submission and writes simulated local positions and learning state. It still reads external market/portfolio data. Run from the repository root so runtime state matches the dashboard. Competition submission is disabled by default.
+
+## Offline demo
+
+After installing the dependencies, run:
+
+```sh
+python demo.py
+```
+
+No `.env`, credentials, exchange CLI, network access, or runtime state files are needed.
+Four real agents analyze deterministic synthetic candles. A high-risk scenario demonstrates
+the guardian forcing a HOLD decision. Output is labeled synthetic; it is not a backtest or
+a performance claim. Unlike `--dry-run`, this command does not read external services.
 
 ## Dashboard
 
@@ -55,4 +68,19 @@ Tests use temporary state and mocked market clients. They cover dashboard startu
 | `PRISM-MCP-Server/` | Independent TypeScript MCP integration; see its README |
 | `ai-trading-agent-template/` | Independent contract/template project and tutorials |
 
-The independent TypeScript projects retain their own dependencies and lockfiles. They are not prerequisites for running the Python dashboard. Historical status reports were consolidated into this README and the limitations document; Git history preserves the originals.
+The independent TypeScript projects retain their own dependencies and lockfiles. They are not prerequisites for running the Python dashboard. Sensitive history has been rewritten; start from a fresh clone.
+
+## Development
+
+See [contribution instructions](CONTRIBUTING.md), the [roadmap](docs/ROADMAP.md), and
+[security guidance](SECURITY.md).
+
+## License
+
+Original NEXUS code and documentation are licensed under [Apache 2.0](LICENSE).
+Copyright 2026 Thapelo Dipela. See [NOTICE](NOTICE).
+
+The bundled PRISM MCP server and trading-agent template retain their existing MIT
+declarations; they are not relicensed by the root license. See the
+[license scope](docs/LICENSING.md) and [third-party inventory](THIRD_PARTY_NOTICES.md)
+for remaining attribution verification before redistributing those components.
