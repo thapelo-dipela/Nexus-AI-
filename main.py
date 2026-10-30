@@ -480,7 +480,9 @@ class MarketDataBuilder:
 
 
 def live_trading_loop(dry_run: bool = False):
-    """Main trading loop."""
+    """Run simulation; live execution is blocked until reconciliation is implemented."""
+    if not dry_run:
+        raise ValueError("Live execution is disabled pending order and accounting reconciliation")
     logger.info("[bold green]Starting NEXUS live trading engine[/bold green]")
 
     # Initialize clients
@@ -567,7 +569,7 @@ def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="NEXUS — Self-Improving Multi-Agent Trading System")
     parser.add_argument("--dry-run", action="store_true", help="Simulate without real orders")
-    parser.add_argument("--live", action="store_true", help="Execute real trades (requires sandbox capital claimed)")
+    parser.add_argument("--live", action="store_true", help="Unavailable: live execution is disabled pending reconciliation")
     parser.add_argument("--leaderboard", action="store_true", help="Print agent leaderboard and exit")
     parser.add_argument("--lablab-status", action="store_true", help="Print lablab.ai competition status and exit")
     parser.add_argument("--submit-lablab", action="store_true", help="Submit current performance to lablab.ai leaderboard")
@@ -578,6 +580,8 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
 
     args = parser.parse_args()
+    if args.live:
+        parser.error("Live execution is disabled pending order and accounting reconciliation. Use demo.py or --dry-run.")
     setup_logging(args.verbose)
 
     # --ping: connectivity check
